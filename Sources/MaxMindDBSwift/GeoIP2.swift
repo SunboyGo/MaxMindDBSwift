@@ -56,7 +56,7 @@ public struct GeoIP2Result {
 }
 
 public final class GeoIP2 {
-    private var mmdb: UnsafeMutablePointer<MMDB_s>?
+    private let mmdb: UnsafeMutablePointer<MMDB_s>
     private let queue = DispatchQueue(label: "com.geoip.queue", attributes: .concurrent)
     
     public init(databasePath: String) throws {
@@ -73,12 +73,8 @@ public final class GeoIP2 {
     }
     
     public func lookup(ip: String) throws -> GeoIP2Result {
-        return try queue.sync(flags: .barrier) { [weak self] in
-            guard let self = self, let mmdb = self.mmdb else {
-                throw GeoIP2Error.openFailed(code: MMDB_IO_ERROR)
-            }
-            
-            return try ip.withCString { cString in
+        try queue.sync {
+            try ip.withCString { cString in
                 var gai_error: Int32 = 0
                 var mmdb_error: Int32 = 0
                 
@@ -120,7 +116,7 @@ public final class GeoIP2 {
     }
     
     private func parseEntryDataList(entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>) throws -> [String: Any] {
-        var result = [String: Any]()
+        var result = Dictionary<String, Any>(minimumCapacity: 16)
         var current: UnsafeMutablePointer<MMDB_entry_data_list_s>? = entryList
         
         while let list = current?.pointee {
@@ -179,9 +175,7 @@ public final class GeoIP2 {
             
         case UInt32(MMDB_DATA_TYPE_MAP):
             var entry = MMDB_entry_s()
-            if let mmdbPtr = mmdb {
-                entry.mmdb = UnsafePointer(mmdbPtr)
-            }
+            entry.mmdb = UnsafePointer(mmdb)
             entry.offset = data.offset
             
             var entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
@@ -199,9 +193,7 @@ public final class GeoIP2 {
         case UInt32(MMDB_DATA_TYPE_ARRAY):
             var array = [Any]()
             var entry = MMDB_entry_s()
-            if let mmdbPtr = mmdb {
-                entry.mmdb = UnsafePointer(mmdbPtr)
-            }
+            entry.mmdb = UnsafePointer(mmdb)
             entry.offset = data.offset
             
             var currentList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
@@ -224,9 +216,7 @@ public final class GeoIP2 {
     }
     
     deinit {
-        if let mmdb = mmdb {
-            MMDB_close(mmdb)
-            mmdb.deallocate()
-        }
+        MMDB_close(mmdb)
+        mmdb.deallocate()
     }
 }
