@@ -88,14 +88,20 @@ jobs:
     - name: Delete existing release if same version
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 检查是否存在同版本的 release
+        # 删除所有相关的远程引用
         if gh release view ${{ env.VERSION }} &>/dev/null; then
-          echo "发现同版本 release，正在删除..."
+          echo "删除已存在的 release..."
           gh release delete ${{ env.VERSION }} -y
           git push origin :refs/tags/${{ env.VERSION }} || true
-          # 等待 GitHub 处理完成
-          sleep 10
+          # 清理本地 tag
+          git tag -d ${{ env.VERSION }} || true
+          # 等待 GitHub 处理
+          sleep 15
         fi
+        
+        # 清理本地 Git 缓存
+        git fetch --prune
+        git gc --prune=now
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -153,11 +159,16 @@ jobs:
     - name: Create Git Tag
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 确保本地是最新的
+        # 确保在最新的提交上创建 tag
+        git fetch --all
+        git checkout main
         git pull origin main
-        # 创建并推送 tag
+        # 创建新的 tag
         git tag -f ${{ env.VERSION }}
+        # 强制推送 tag
         git push -f origin ${{ env.VERSION }}
+        # 等待 tag 更新
+        sleep 5
 
     - name: Prepare Release Assets
       if: steps.check.outputs.update_needed == 'true'
