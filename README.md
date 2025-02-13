@@ -18,7 +18,7 @@ Add the package dependency to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "1.0.0")
+    .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "1.0.0.44")
 ]
 ```
 
@@ -48,35 +48,36 @@ do {
     // Display the complete lookup result
     print(result.prettyPrint())
     
-    // Example output:
-    // {
-    //   geoname_id: 6252001
-    //   iso_code: "US"
-    //   names: {
-    //     en: "United States"
-    //     zh-CN: "美国"
-    //     de: "USA"
-    //     fr: "États Unis"
-    //     ja: "アメリカ"
-    //     pt-BR: "EUA"
-    //     es: "Estados Unidos"
-    //     ru: "США"
-    //   }
-    //   continent: {
-    //     geoname_id: 6255149
-    //     code: "NA"
-    //     names: {
-    //       en: "North America"
-    //       es: "Norteamérica"
-    //       de: "Nordamerika"
-    //       zh-CN: "北美洲"
-    //       fr: "Amérique du Nord"
-    //       pt-BR: "América do Norte"
-    //       ru: "Северная Америка"
-    //       ja: "北アメリカ"
-    //     }
-    //   }
-    // }
+    /* Example output:
+    {
+      geoname_id: 6252001
+      iso_code: "US"
+      names: {
+        en: "United States"
+        zh-CN: "美国"
+        de: "USA"
+        fr: "États Unis"
+        ja: "アメリカ"
+        pt-BR: "EUA"
+        es: "Estados Unidos"
+        ru: "США"
+      }
+      continent: {
+        geoname_id: 6255149
+        code: "NA"
+        names: {
+          en: "North America"
+          es: "Norteamérica"
+          de: "Nordamerika"
+          zh-CN: "北美洲"
+          fr: "Amérique du Nord"
+          pt-BR: "América do Norte"
+          ru: "Северная Америка"
+          ja: "北アメリカ"
+        }
+      }
+    }
+    */
     
     // Extract specific geolocation data
     if let names = result.data["names"] as? [String: String],
