@@ -34,31 +34,9 @@ jobs:
     - name: Create build script
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 先保存原始内容到临时文件
-        echo "${{ secrets.BUILD_SCRIPT }}" > original_script.sh
-        echo "原始脚本大小："
-        wc -l original_script.sh
-        
-        # 检查特定行附近的内容
-        echo "检查第 115-125 行："
-        sed -n '115,125p' original_script.sh
-        
-        # 检查是否有特殊字符
-        echo "检查特殊字符："
-        cat -A original_script.sh | sed -n '115,125p'
-        
-        # 尝试不同的处理方式
-        echo "${{ secrets.BUILD_SCRIPT }}" | sed 's/\r//g' | sed 's/[^[:print:]\t\n]//g' > build-script.sh
+        # 使用 base64 编码和解码来避免特殊字符问题
+        echo "${{ secrets.BUILD_SCRIPT }}" | base64 -d > build-script.sh
         chmod +x build-script.sh
-        
-        echo "最终脚本大小："
-        wc -l build-script.sh
-        
-        echo "检查最终脚本第 115-125 行："
-        sed -n '115,125p' build-script.sh
-        
-        echo "检查最终脚本特殊字符："
-        cat -A build-script.sh | sed -n '115,125p'
 
     - name: Clone libmaxminddb
       if: steps.check.outputs.update_needed == 'true'
