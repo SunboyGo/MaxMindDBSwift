@@ -64,15 +64,30 @@ jobs:
         ls -la
         ./build-script.sh
         
+    - name: Prepare Release Assets
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        cd "${PROJECT_ROOT}"
+        zip -r MaxMindDBSwift.xcframework.zip PackageOutput/MaxMindDBSwift/XCFrameworks/MaxMindDBSwift.xcframework
+
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.VERSION }}
         name: Release ${{ env.VERSION }}
-        files: PackageOutput/MaxMindDBSwift/XCFrameworks/MaxMindDBSwift.xcframework/**/*
+        files: MaxMindDBSwift.xcframework.zip
         body: |
           Updated to libmaxminddb version ${{ env.VERSION }}
+          
+          ### Installation
+          
+          Add the following to your Package.swift:
+          ```swift
+          dependencies: [
+              .package(url: "https://github.com/YOUR_USERNAME/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+          ]
+          ```
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
