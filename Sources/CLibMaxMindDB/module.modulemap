@@ -1,0 +1,5 @@
+module CLibMaxMindDB {
+    umbrella header "maxminddb.h"
+    link "maxminddb"
+    export *
+}
