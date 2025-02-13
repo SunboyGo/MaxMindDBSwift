@@ -124,33 +124,37 @@ jobs:
         echo "复制后的结构："
         ls -R
         
-        # 设置文件权限（修改后的方式）
+        # 设置文件权限
         sudo chmod -R 755 .
         sudo chown -R $USER .
         
-        # 检查文件结构和权限
-        echo "检查文件结构和权限..."
-        ls -la
-        ls -R Sources/
-        ls -R XCFrameworks/
-        cat Package.swift
+        # 配置 git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
         
-        # 确保 git 能跟踪这些文件
+        # 强制添加所有文件
+        git add -A
+        
+        # 显示将要提交的文件
+        echo "将要提交的文件："
         git status
         
         # 提交更改
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add -f Sources XCFrameworks Package.swift
-        git status  # 再次检查状态
         git commit -m "Update package files for version ${{ env.VERSION }}"
         
-        # 推送所有更改
-        git push --force
+        # 强制推送到主分支
+        git push origin HEAD:main --force
+        
+        # 验证推送结果
+        echo "验证远程仓库文件："
+        git ls-remote --heads origin main
 
     - name: Create Git Tag
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        # 确保本地是最新的
+        git pull origin main
+        # 创建并推送 tag
         git tag -f ${{ env.VERSION }}
         git push -f origin ${{ env.VERSION }}
 
