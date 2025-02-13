@@ -19,6 +19,9 @@ jobs:
       id: check
       run: |
         VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        if [ -z "$VERSION" ]; then
+          VERSION="1.12.2"  # 设置默认版本
+        fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
@@ -31,9 +34,9 @@ jobs:
     - name: Create build script
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        echo "${{ secrets.BUILD_SCRIPT }}" > build-script.sh
+        echo "${{ secrets.BUILD_SCRIPT }}" | tr -d '\r' > build-script.sh
         chmod +x build-script.sh
-        
+
     - name: Clone libmaxminddb
       if: steps.check.outputs.update_needed == 'true'
       run: |
