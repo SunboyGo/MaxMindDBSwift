@@ -4,11 +4,11 @@ A high-performance Swift wrapper for the MaxMind GeoIP2 database reader. This li
 
 ## Key Features
 
-- Native Swift implementation with full iOS 12.0+ and macOS 10.15+ support
-- Thread-safe concurrent IP lookups with Grand Central Dispatch
-- Efficient memory management and resource handling
-- Comprehensive error handling with detailed diagnostics
-- Seamless integration via Swift Package Manager
+- High-performance Swift implementation with iOS 12.0+ and macOS 10.15+ support
+- Optimized concurrent IP lookups using Grand Central Dispatch
+- Zero-overhead memory management with direct C interop
+- Type-safe API with comprehensive error handling
+- Simple integration via Swift Package Manager
 
 ## Installation
 
@@ -18,7 +18,7 @@ Add the package dependency to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "1.0.0.44")
+    .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "1.0.0")
 ]
 ```
 
@@ -101,7 +101,7 @@ do {
 
 ## Concurrency Support
 
-The `GeoIP2` class implements thread-safe operations using Grand Central Dispatch, allowing concurrent IP lookups from multiple threads without explicit synchronization.
+The `GeoIP2` class implements a highly efficient concurrent read model using Grand Central Dispatch. The implementation allows multiple threads to perform IP lookups simultaneously without any synchronization overhead, maximizing performance on multi-core systems. The database access is handled through memory-mapped files (MMAP) which provides optimal I/O performance for concurrent reads.
 
 ## License
 
