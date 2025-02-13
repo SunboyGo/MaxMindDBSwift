@@ -18,24 +18,22 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 获取远程仓库最新版本
-        REMOTE_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
-        # 获取本地记录的版本
-        LOCAL_VERSION=$(cat .version 2>/dev/null || echo "none")
-        
-        if [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
-          echo "update_needed=true" >> $GITHUB_OUTPUT
-          echo "new_version=${REMOTE_VERSION}" >> $GITHUB_OUTPUT
-          echo "$REMOTE_VERSION" > .version
-        else
-          echo "update_needed=false" >> $GITHUB_OUTPUT
-          echo "new_version=${REMOTE_VERSION}" >> $GITHUB_OUTPUT
-        fi
+        # 直接设置版本号到输出
+        VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        echo "new_version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "update_needed=true" >> $GITHUB_OUTPUT
+        echo "${VERSION}" > .version
 
     - name: Setup build environment
       if: steps.check.outputs.update_needed == 'true'
       run: |
         brew install automake autoconf libtool
+        
+    - name: Create build script
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        echo "${{ secrets.BUILD_SCRIPT }}" > build-script.sh
+        chmod +x build-script.sh
         
     - name: Clone libmaxminddb
       if: steps.check.outputs.update_needed == 'true'
@@ -47,7 +45,6 @@ jobs:
     - name: Build XCFramework
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        chmod +x ./build-script.sh
         ./build-script.sh
         
     - name: Create Release
@@ -65,7 +62,6 @@ jobs:
     - name: Update Version File
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        echo "${{ steps.check.outputs.new_version }}" > .version
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .version
