@@ -103,10 +103,10 @@ do {
 
 The `GeoIP2` class implements an efficient concurrent read model using a Grand Central Dispatch concurrent queue. The implementation enables multiple threads to perform IP lookups simultaneously while maintaining thread safety. The underlying database access is handled through memory-mapped files (MMAP) by libmaxminddb, providing efficient I/O performance for database reads.
 
+## Acknowledgments
+
+Special thanks to [MaxMind](https://www.maxmind.com/) for creating and maintaining the excellent [libmaxminddb](https://github.com/maxmind/libmaxminddb) C library, which forms the foundation of this project.
+
 ## License
 
 Released under the MIT License. See the [LICENSE](LICENSE) file for the complete license terms.
-
-## Credits
-
-This project builds upon the excellent work of [MaxMind](https://www.maxmind.com/) and their [libmaxminddb](https://github.com/maxmind/libmaxminddb) C library.
