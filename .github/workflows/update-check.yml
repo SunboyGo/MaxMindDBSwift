@@ -102,6 +102,22 @@ jobs:
     - name: Prepare Repository Files
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        # 清理旧文件
+        rm -rf Sources XCFrameworks Package.swift build-script.sh
+        
+        # 复制必要文件
+        mkdir -p Sources/MaxMindDBSwift Sources/CLibMaxMindDB XCFrameworks
+        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
+        cp -R PackageOutput/MaxMindDBSwift/Sources/CLibMaxMindDB/* Sources/CLibMaxMindDB/
+        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks/* XCFrameworks/
+        cp PackageOutput/MaxMindDBSwift/Package.swift ./
+        
+        # 清理构建脚本
+        rm -f build-script.sh
+        
+        # 只添加必要文件
+        git add Sources XCFrameworks Package.swift
+        
         # 显示当前目录结构
         echo "当前目录结构："
         pwd
@@ -111,19 +127,6 @@ jobs:
         echo "PackageOutput 内容："
         ls -R PackageOutput/
         
-        # 清理并复制文件
-        rm -rf Sources XCFrameworks Package.swift
-        mkdir -p Sources/MaxMindDBSwift Sources/CLibMaxMindDB XCFrameworks
-        
-        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
-        cp -R PackageOutput/MaxMindDBSwift/Sources/CLibMaxMindDB/* Sources/CLibMaxMindDB/
-        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks/* XCFrameworks/
-        cp PackageOutput/MaxMindDBSwift/Package.swift ./
-        
-        # 显示复制后的结构
-        echo "复制后的结构："
-        ls -R
-        
         # 设置文件权限
         sudo chmod -R 755 .
         sudo chown -R $USER .
@@ -131,9 +134,6 @@ jobs:
         # 配置 git
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        
-        # 强制添加所有文件
-        git add -A
         
         # 显示将要提交的文件
         echo "将要提交的文件："
