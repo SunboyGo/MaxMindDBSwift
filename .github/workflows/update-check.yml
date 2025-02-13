@@ -119,13 +119,13 @@ jobs:
           Add the following to your Package.swift:
           ```swift
           dependencies: [
-              .package(url: "https://github.com/wlgemini/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
           
           Or add the package dependency in Xcode:
           1. File > Add Packages...
-          2. Enter package URL: `https://github.com/wlgemini/MaxMindDBSwift.git`
+          2. Enter package URL: `https://github.com/SunboyGo/MaxMindDBSwift.git`
           3. Select "Up to Next Major Version" with "${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
