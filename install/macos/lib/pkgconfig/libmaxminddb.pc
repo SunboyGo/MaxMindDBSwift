@@ -1,0 +1,11 @@
+prefix=/Users/runner/work/MaxMindDBSwift/MaxMindDBSwift/install/macos
+exec_prefix=/Users/runner/work/MaxMindDBSwift/MaxMindDBSwift/install/macos
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libmaxminddb
+Description: C library for the MaxMind DB file format
+URL: https://maxmind.github.io/libmaxminddb/
+Version: 1.12.2
+Libs: -L${libdir} -lmaxminddb
+Cflags: -I${includedir}
