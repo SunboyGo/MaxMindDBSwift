@@ -40,10 +40,13 @@ jobs:
         git clone https://github.com/maxmind/libmaxminddb.git
         cd libmaxminddb
         git checkout "${{ env.VERSION }}"
+        cd ..
         
     - name: Build XCFramework
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        pwd
+        ls -la
         ./build-script.sh
         
     - name: Create Release
