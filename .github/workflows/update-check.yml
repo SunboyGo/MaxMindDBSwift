@@ -79,7 +79,7 @@ jobs:
       run: |
         pwd
         ls -la
-        ./build-script.sh
+        LIBMAXMINDDB_VERSION="${{ env.LIBMAXMINDDB_VERSION }}" ./build-script.sh
         
     - name: Delete existing release if same version
       if: steps.check.outputs.update_needed == 'true'
