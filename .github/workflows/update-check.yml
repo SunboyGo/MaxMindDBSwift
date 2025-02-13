@@ -20,7 +20,7 @@ jobs:
       run: |
         VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
         if [ -z "$VERSION" ]; then
-          VERSION="1.12.2"  # 设置默认版本
+          VERSION="1.7.1"  # 设置默认版本
         fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
@@ -34,8 +34,24 @@ jobs:
     - name: Create build script
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        # 先保存原始内容到临时文件
+        echo "${{ secrets.BUILD_SCRIPT }}" > original_script.sh
+        echo "原始脚本大小："
+        wc -l original_script.sh
+        
+        # 检查特定行附近的内容
+        echo "检查第 120-122 行："
+        sed -n '120,122p' original_script.sh
+        
+        # 处理并创建最终脚本
         echo "${{ secrets.BUILD_SCRIPT }}" | tr -d '\r' > build-script.sh
         chmod +x build-script.sh
+        
+        echo "最终脚本大小："
+        wc -l build-script.sh
+        
+        echo "检查最终脚本第 120-122 行："
+        sed -n '120,122p' build-script.sh
 
     - name: Clone libmaxminddb
       if: steps.check.outputs.update_needed == 'true'
