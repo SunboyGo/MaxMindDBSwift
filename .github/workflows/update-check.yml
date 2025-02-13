@@ -99,6 +99,21 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Prepare Repository Files
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        # 复制文件到仓库根目录
+        cp -R PackageOutput/MaxMindDBSwift/Sources ./
+        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks ./
+        cp PackageOutput/MaxMindDBSwift/Package.swift ./
+        
+        # 提交更改
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add Sources XCFrameworks Package.swift
+        git commit -m "Update package files for version ${{ env.VERSION }}"
+        git push
+
     - name: Create Git Tag
       if: steps.check.outputs.update_needed == 'true'
       run: |
@@ -127,13 +142,13 @@ jobs:
           Add the following to your Package.swift:
           ```swift
           dependencies: [
-              .package(url: "https://github.com//MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
           
           Or add the package dependency in Xcode:
           1. File > Add Packages...
-          2. Enter package URL: `https://github.com//MaxMindDBSwift.git`
+          2. Enter package URL: `https://github.com/SunboyGo/MaxMindDBSwift.git`
           3. Select "Up to Next Major Version" with "${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
