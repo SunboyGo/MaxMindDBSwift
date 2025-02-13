@@ -28,35 +28,27 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 设置默认版本
-        DEFAULT_VERSION="1.12.2"
+        # 设置基础版本
+        BASE_VERSION="1.0.0"
         
-        # 获取当前版本
-        CURRENT_VERSION=""
-        if [ -f .version ]; then
-          CURRENT_VERSION=$(cat .version)
+        # 获取当前构建号
+        CURRENT_BUILD="0"
+        if [ -f .build-number ]; then
+          CURRENT_BUILD=$(cat .build-number)
         fi
         
-        # 尝试获取最新版本
-        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        # 增加构建号
+        BUILD_NUMBER=$((CURRENT_BUILD + 1))
+        echo "$BUILD_NUMBER" > .build-number
         
-        # 如果获取失败，使用默认版本
-        if [ "$LATEST_VERSION" = "null" ] || [ -z "$LATEST_VERSION" ]; then
-          VERSION="$DEFAULT_VERSION"
-        else
-          VERSION="$LATEST_VERSION"
-        fi
+        VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
         
-        # 总是标记需要更新，这样就会重新构建
+        # 设置环境变量
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
         
-        if [ "$VERSION" = "$CURRENT_VERSION" ]; then
-          echo "重新构建当前版本: $VERSION"
-        else
-          echo "构建新版本: $CURRENT_VERSION -> $VERSION"
-        fi
+        echo "构建新版本: ${VERSION}"
 
     - name: Setup build environment
       if: steps.check.outputs.update_needed == 'true'
@@ -88,19 +80,19 @@ jobs:
     - name: Delete existing release if same version
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 删除所有相关的远程引用
-        if gh release view ${{ env.VERSION }} &>/dev/null; then
-          echo "删除已存在的 release..."
-          gh release delete ${{ env.VERSION }} -y
-          git push origin :refs/tags/${{ env.VERSION }} || true
-          # 清理本地 tag
-          git tag -d ${{ env.VERSION }} || true
-          # 等待 GitHub 处理
-          sleep 15
-        fi
+        # 删除所有相关的版本
+        for tag in $(git tag -l "${BASE_VERSION}*"); do
+          echo "删除 tag: $tag"
+          gh release delete "$tag" -y || true
+          git push origin ":refs/tags/$tag" || true
+          git tag -d "$tag" || true
+        done
         
-        # 清理本地 Git 缓存
-        git fetch --prune
+        # 等待 GitHub 处理
+        sleep 15
+        
+        # 强制清理
+        git fetch --prune --prune-tags
         git gc --prune=now
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -215,21 +207,11 @@ jobs:
     - name: Update Version File
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 获取当前版本
-        CURRENT_VERSION=""
-        if [ -f .version ]; then
-          CURRENT_VERSION=$(cat .version)
-        fi
-        
-        # 只有当版本不同时才更新
-        if [ "$CURRENT_VERSION" != "${{ env.VERSION }}" ]; then
-          echo "${{ env.VERSION }}" > .version
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add .version
-          git commit -m "Update to version ${{ env.VERSION }}"
-          git push
-        else
-          echo "版本文件已是最新版本，无需更新"
-        fi
+        # 提交版本文件和构建号
+        echo "${{ env.VERSION }}" > .version
+        git add .version .build-number
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git commit -m "Update to version ${{ env.VERSION }}"
+        git push
       continue-on-error: true 
