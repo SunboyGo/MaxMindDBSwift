@@ -1,0 +1,72 @@
+name: Check for Updates
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天运行
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  check-and-build:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        
+    - name: Check libmaxminddb for updates
+      id: check
+      run: |
+        # 获取远程仓库最新版本
+        REMOTE_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        # 获取本地记录的版本
+        LOCAL_VERSION=$(cat .version 2>/dev/null || echo "none")
+        
+        if [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+          echo "$REMOTE_VERSION" > .version
+        else
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+        fi
+        echo "new_version=$REMOTE_VERSION" >> $GITHUB_OUTPUT
+
+    - name: Setup build environment
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        brew install automake autoconf libtool
+        
+    - name: Clone libmaxminddb
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        git clone https://github.com/maxmind/libmaxminddb.git
+        cd libmaxminddb
+        git checkout ${{ steps.check.outputs.new_version }}
+        
+    - name: Build XCFramework
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        chmod +x ./build-script.sh
+        ./build-script.sh
+        
+    - name: Create Release
+      if: steps.check.outputs.update_needed == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.check.outputs.new_version }}
+        name: Release ${{ steps.check.outputs.new_version }}
+        files: PackageOutput/MaxMindDBSwift/XCFrameworks/MaxMindDBSwift.xcframework/**/*
+        body: |
+          Updated to libmaxminddb version ${{ steps.check.outputs.new_version }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Update Version File
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        echo "${{ steps.check.outputs.new_version }}" > .version
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add .version
+        git commit -m "Update to version ${{ steps.check.outputs.new_version }}"
+        git push 
