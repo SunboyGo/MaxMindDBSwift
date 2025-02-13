@@ -34,15 +34,8 @@ jobs:
         # 获取 libmaxminddb 的版本
         LIBMAXMINDDB_VERSION="1.12.2"  # 使用固定版本
         
-        # 获取当前构建号
-        CURRENT_BUILD="0"
-        if [ -f .build-number ]; then
-          CURRENT_BUILD=$(cat .build-number)
-        fi
-        
-        # 增加构建号
-        BUILD_NUMBER=$((CURRENT_BUILD + 1))
-        echo "$BUILD_NUMBER" > .build-number
+        # 使用 GitHub run_number 作为构建号
+        BUILD_NUMBER=${{ github.run_number }}
         
         VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
         
@@ -211,11 +204,6 @@ jobs:
     - name: Update Version File
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 提交版本文件和构建号
-        echo "${{ env.VERSION }}" > .version
-        git add .version .build-number
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git commit -m "Update to version ${{ env.VERSION }}"
-        git push
       continue-on-error: true 
