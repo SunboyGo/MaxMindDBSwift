@@ -101,7 +101,7 @@ do {
 
 ## Concurrency Support
 
-The `GeoIP2` class implements a highly efficient concurrent read model using Grand Central Dispatch. The implementation allows multiple threads to perform IP lookups simultaneously without any synchronization overhead, maximizing performance on multi-core systems. The database access is handled through memory-mapped files (MMAP) which provides optimal I/O performance for concurrent reads.
+The `GeoIP2` class implements an efficient concurrent read model using a Grand Central Dispatch concurrent queue. The implementation enables multiple threads to perform IP lookups simultaneously while maintaining thread safety. The underlying database access is handled through memory-mapped files (MMAP) by libmaxminddb, providing efficient I/O performance for database reads.
 
 ## License
 
