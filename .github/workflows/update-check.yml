@@ -113,9 +113,9 @@ jobs:
         cp -R PackageOutput/MaxMindDBSwift/XCFrameworks ./
         cp PackageOutput/MaxMindDBSwift/Package.swift ./
         
-        # 设置文件权限
-        chmod -R 644 Sources XCFrameworks Package.swift
-        find Sources XCFrameworks -type d -exec chmod 755 {} \;
+        # 设置文件权限（修改后的方式）
+        sudo chmod -R 755 .
+        sudo chown -R $USER .
         
         # 检查文件结构和权限
         echo "检查文件结构和权限..."
