@@ -68,7 +68,9 @@ jobs:
       if: steps.check.outputs.update_needed == 'true'
       run: |
         cd "${PROJECT_ROOT}"
-        zip -r MaxMindDBSwift.xcframework.zip PackageOutput/MaxMindDBSwift/XCFrameworks/MaxMindDBSwift.xcframework
+        # 打包整个 SwiftPM 包
+        cd PackageOutput
+        zip -r ../MaxMindDBSwift-${{ env.VERSION }}.zip MaxMindDBSwift/
 
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
@@ -76,7 +78,7 @@ jobs:
       with:
         tag_name: ${{ env.VERSION }}
         name: Release ${{ env.VERSION }}
-        files: MaxMindDBSwift.xcframework.zip
+        files: MaxMindDBSwift-${{ env.VERSION }}.zip
         body: |
           Updated to libmaxminddb version ${{ env.VERSION }}
           
@@ -85,9 +87,14 @@ jobs:
           Add the following to your Package.swift:
           ```swift
           dependencies: [
-              .package(url: "https://github.com/YOUR_USERNAME/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
+          
+          Or add the package dependency in Xcode:
+          1. File > Add Packages...
+          2. Enter package URL: `https://github.com/SunboyGo/MaxMindDBSwift.git`
+          3. Select "Up to Next Major Version" with "${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
