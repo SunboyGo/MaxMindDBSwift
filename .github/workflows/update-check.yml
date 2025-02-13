@@ -106,9 +106,10 @@ jobs:
         rm -rf Sources XCFrameworks Package.swift build-script.sh
         
         # 复制必要文件
-        mkdir -p Sources/MaxMindDBSwift Sources/CLibMaxMindDB XCFrameworks
-        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
+        mkdir -p Sources Sources/CLibMaxMindDB XCFrameworks
+        cp -R PackageOutput/MaxMindDBSwift/Sources/* Sources/
         cp -R PackageOutput/MaxMindDBSwift/Sources/CLibMaxMindDB/* Sources/CLibMaxMindDB/
+        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
         cp -R PackageOutput/MaxMindDBSwift/XCFrameworks/* XCFrameworks/
         cp PackageOutput/MaxMindDBSwift/Package.swift ./
         
