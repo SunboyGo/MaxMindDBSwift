@@ -102,16 +102,27 @@ jobs:
     - name: Prepare Repository Files
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        # 临时禁用 .gitignore
-        mv .gitignore .gitignore.bak || true
+        # 显示当前目录结构
+        echo "当前目录结构："
+        pwd
+        ls -la
         
-        # 清理旧文件
+        # 显示 PackageOutput 内容
+        echo "PackageOutput 内容："
+        ls -R PackageOutput/
+        
+        # 清理并复制文件
         rm -rf Sources XCFrameworks Package.swift
+        mkdir -p Sources/MaxMindDBSwift Sources/CLibMaxMindDB XCFrameworks
         
-        # 复制新文件
-        cp -R PackageOutput/MaxMindDBSwift/Sources ./
-        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks ./
+        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
+        cp -R PackageOutput/MaxMindDBSwift/Sources/CLibMaxMindDB/* Sources/CLibMaxMindDB/
+        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks/* XCFrameworks/
         cp PackageOutput/MaxMindDBSwift/Package.swift ./
+        
+        # 显示复制后的结构
+        echo "复制后的结构："
+        ls -R
         
         # 设置文件权限（修改后的方式）
         sudo chmod -R 755 .
@@ -133,11 +144,6 @@ jobs:
         git add -f Sources XCFrameworks Package.swift
         git status  # 再次检查状态
         git commit -m "Update package files for version ${{ env.VERSION }}"
-        
-        # 恢复 .gitignore
-        mv .gitignore.bak .gitignore || true
-        git add .gitignore
-        git commit -m "Restore .gitignore" || true
         
         # 推送所有更改
         git push --force
