@@ -15,11 +15,27 @@ jobs:
       with:
         fetch-depth: 0
         
+    - name: Delete existing release and tag
+      run: |
+        # 删除远程 tag
+        git push origin :refs/tags/${{ env.VERSION }} || true
+        # 删除本地 tag
+        git tag -d ${{ env.VERSION }} || true
+        # 删除 .version 文件
+        rm -f .version || true
+      continue-on-error: true
+        
     - name: Check libmaxminddb for updates
       id: check
       run: |
         # 设置默认版本
         DEFAULT_VERSION="1.12.2"
+        
+        # 获取当前版本
+        CURRENT_VERSION=""
+        if [ -f .version ]; then
+          CURRENT_VERSION=$(cat .version)
+        fi
         
         # 尝试获取最新版本
         LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
@@ -31,11 +47,16 @@ jobs:
           VERSION="$LATEST_VERSION"
         fi
         
-        # 输出版本信息
-        echo "使用版本: $VERSION"
+        # 总是标记需要更新，这样就会重新构建
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
+        
+        if [ "$VERSION" = "$CURRENT_VERSION" ]; then
+          echo "重新构建当前版本: $VERSION"
+        else
+          echo "构建新版本: $CURRENT_VERSION -> $VERSION"
+        fi
 
     - name: Setup build environment
       if: steps.check.outputs.update_needed == 'true'
@@ -64,11 +85,22 @@ jobs:
         ls -la
         ./build-script.sh
         
+    - name: Delete existing release if same version
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        # 检查是否存在同版本的 release
+        if gh release view ${{ env.VERSION }} &>/dev/null; then
+          echo "发现同版本 release，正在删除..."
+          gh release delete ${{ env.VERSION }} -y
+          git push origin :refs/tags/${{ env.VERSION }} || true
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Prepare Release Assets
       if: steps.check.outputs.update_needed == 'true'
       run: |
         cd "${PROJECT_ROOT}"
-        # 打包整个 SwiftPM 包
         cd PackageOutput
         zip -r ../MaxMindDBSwift-${{ env.VERSION }}.zip MaxMindDBSwift/
 
