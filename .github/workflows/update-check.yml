@@ -31,6 +31,9 @@ jobs:
         # 设置基础版本
         BASE_VERSION="1.0.0"
         
+        # 获取 libmaxminddb 的版本
+        LIBMAXMINDDB_VERSION="1.12.2"  # 使用固定版本
+        
         # 获取当前构建号
         CURRENT_BUILD="0"
         if [ -f .build-number ]; then
@@ -45,6 +48,7 @@ jobs:
         
         # 设置环境变量
         echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "LIBMAXMINDDB_VERSION=$LIBMAXMINDDB_VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
         
@@ -67,7 +71,7 @@ jobs:
       run: |
         git clone https://github.com/maxmind/libmaxminddb.git
         cd libmaxminddb
-        git checkout "${{ env.VERSION }}"
+        git checkout "${{ env.LIBMAXMINDDB_VERSION }}"
         cd ..
         
     - name: Build XCFramework
