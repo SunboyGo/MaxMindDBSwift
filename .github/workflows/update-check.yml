@@ -93,9 +93,17 @@ jobs:
           echo "发现同版本 release，正在删除..."
           gh release delete ${{ env.VERSION }} -y
           git push origin :refs/tags/${{ env.VERSION }} || true
+          # 等待 GitHub 处理完成
+          sleep 10
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create Git Tag
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        git tag -f ${{ env.VERSION }}
+        git push -f origin ${{ env.VERSION }}
 
     - name: Prepare Release Assets
       if: steps.check.outputs.update_needed == 'true'
@@ -119,13 +127,13 @@ jobs:
           Add the following to your Package.swift:
           ```swift
           dependencies: [
-              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+              .package(url: "https://github.com//MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
           
           Or add the package dependency in Xcode:
           1. File > Add Packages...
-          2. Enter package URL: `https://github.com/SunboyGo/MaxMindDBSwift.git`
+          2. Enter package URL: `https://github.com//MaxMindDBSwift.git`
           3. Select "Up to Next Major Version" with "${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -142,9 +150,21 @@ jobs:
     - name: Update Version File
       if: steps.check.outputs.update_needed == 'true'
       run: |
-        echo "${{ env.VERSION }}" > .version
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add .version
-        git commit -m "Update to version ${{ env.VERSION }}"
-        git push 
+        # 获取当前版本
+        CURRENT_VERSION=""
+        if [ -f .version ]; then
+          CURRENT_VERSION=$(cat .version)
+        fi
+        
+        # 只有当版本不同时才更新
+        if [ "$CURRENT_VERSION" != "${{ env.VERSION }}" ]; then
+          echo "${{ env.VERSION }}" > .version
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .version
+          git commit -m "Update to version ${{ env.VERSION }}"
+          git push
+        else
+          echo "版本文件已是最新版本，无需更新"
+        fi
+      continue-on-error: true 
