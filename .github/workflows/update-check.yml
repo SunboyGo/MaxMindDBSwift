@@ -25,11 +25,12 @@ jobs:
         
         if [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; then
           echo "update_needed=true" >> $GITHUB_OUTPUT
+          echo "new_version=${REMOTE_VERSION}" >> $GITHUB_OUTPUT
           echo "$REMOTE_VERSION" > .version
         else
           echo "update_needed=false" >> $GITHUB_OUTPUT
+          echo "new_version=${REMOTE_VERSION}" >> $GITHUB_OUTPUT
         fi
-        echo "new_version=$REMOTE_VERSION" >> $GITHUB_OUTPUT
 
     - name: Setup build environment
       if: steps.check.outputs.update_needed == 'true'
@@ -41,7 +42,7 @@ jobs:
       run: |
         git clone https://github.com/maxmind/libmaxminddb.git
         cd libmaxminddb
-        git checkout ${{ steps.check.outputs.new_version }}
+        git checkout "${{ steps.check.outputs.new_version }}"
         
     - name: Build XCFramework
       if: steps.check.outputs.update_needed == 'true'
