@@ -18,11 +18,10 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 直接设置版本号到输出
         VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
-        echo "new_version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
-        echo "${VERSION}" > .version
 
     - name: Setup build environment
       if: steps.check.outputs.update_needed == 'true'
@@ -40,7 +39,7 @@ jobs:
       run: |
         git clone https://github.com/maxmind/libmaxminddb.git
         cd libmaxminddb
-        git checkout "${{ steps.check.outputs.new_version }}"
+        git checkout "${{ env.VERSION }}"
         
     - name: Build XCFramework
       if: steps.check.outputs.update_needed == 'true'
@@ -51,19 +50,20 @@ jobs:
       if: steps.check.outputs.update_needed == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.check.outputs.new_version }}
-        name: Release ${{ steps.check.outputs.new_version }}
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
         files: PackageOutput/MaxMindDBSwift/XCFrameworks/MaxMindDBSwift.xcframework/**/*
         body: |
-          Updated to libmaxminddb version ${{ steps.check.outputs.new_version }}
+          Updated to libmaxminddb version ${{ env.VERSION }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Update Version File
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        echo "${{ env.VERSION }}" > .version
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add .version
-        git commit -m "Update to version ${{ steps.check.outputs.new_version }}"
+        git commit -m "Update to version ${{ env.VERSION }}"
         git push 
