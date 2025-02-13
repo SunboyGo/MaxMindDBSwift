@@ -18,10 +18,21 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
-        if [ -z "$VERSION" ]; then
-          VERSION="1.7.1"  # 设置默认版本
+        # 设置默认版本
+        DEFAULT_VERSION="1.12.2"
+        
+        # 尝试获取最新版本
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        
+        # 如果获取失败，使用默认版本
+        if [ "$LATEST_VERSION" = "null" ] || [ -z "$LATEST_VERSION" ]; then
+          VERSION="$DEFAULT_VERSION"
+        else
+          VERSION="$LATEST_VERSION"
         fi
+        
+        # 输出版本信息
+        echo "使用版本: $VERSION"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         echo "update_needed=true" >> $GITHUB_OUTPUT
