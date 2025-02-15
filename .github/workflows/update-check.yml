@@ -2,7 +2,7 @@ name: Check for Updates
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 每天运行
+    - cron: '0 */12 * * *'  # 每12小时检查一次
   workflow_dispatch:      # 允许手动触发
 
 jobs:
@@ -28,22 +28,29 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 设置基础版本
-        BASE_VERSION="1.0.0"
+        # 获取 libmaxminddb 的最新版本
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
         
-        # 获取 libmaxminddb 的版本
-        LIBMAXMINDDB_VERSION="1.12.2"  # 使用固定版本
+        # 获取当前使用的版本
+        CURRENT_VERSION="1.12.2"
         
-        # 使用 GitHub run_number 作为构建号
-        BUILD_NUMBER=${{ github.run_number }}
+        # 比较版本
+        if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
+          echo "No updates available"
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
         
-        VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
-        
-        # 设置环境变量
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "LIBMAXMINDDB_VERSION=$LIBMAXMINDDB_VERSION" >> $GITHUB_ENV
-        echo "new_version=$VERSION" >> $GITHUB_OUTPUT
+        # 有新版本时更新
+        echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
         echo "update_needed=true" >> $GITHUB_OUTPUT
+        
+        # 设置其他变量
+        BASE_VERSION="1.0.0"
+        BUILD_NUMBER=${{ github.run_number }}
+        VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "new_version=$VERSION" >> $GITHUB_OUTPUT
         
         echo "构建新版本: ${VERSION}"
 
