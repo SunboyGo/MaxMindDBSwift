@@ -110,11 +110,6 @@ jobs:
         VERSION="1.0.${GITHUB_RUN_NUMBER}"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "update_needed=true" >> $GITHUB_OUTPUT
-
-    - name: Update Package.swift and module.modulemap
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        echo "Updating paths to version: ${LATEST_VERSION#v}"
         
         # 更新 Package.swift
         sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${LATEST_VERSION#v}\/src/g" Package.swift
@@ -123,6 +118,8 @@ jobs:
         # 更新 module.modulemap
         sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Sources/CLibMaxMindDB/module.modulemap
         
+        echo "LATEST_VERSION: $LATEST_VERSION"
+        echo "LIBMAXMINDDB_VERSION: $LIBMAXMINDDB_VERSION"
         echo "Content of Package.swift after update:"
         cat Package.swift
         
