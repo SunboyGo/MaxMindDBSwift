@@ -111,11 +111,6 @@ jobs:
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "update_needed=true" >> $GITHUB_OUTPUT
 
-    - name: Test package
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        swift test
-
     - name: Update Package.swift and module.modulemap
       if: steps.check.outputs.update_needed == 'true'
       run: |
@@ -125,6 +120,11 @@ jobs:
         
         # 更新 module.modulemap
         sed -i '' "s/libmaxminddb-[0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Sources/CLibMaxMindDB/module.modulemap
+
+    - name: Test package
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        swift test
 
     - name: Commit updates
       if: steps.check.outputs.update_needed == 'true'
