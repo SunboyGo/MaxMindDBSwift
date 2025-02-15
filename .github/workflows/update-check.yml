@@ -22,15 +22,18 @@ jobs:
       run: |
         # 获取最新版本
         echo "Fetching latest version from GitHub API..."
-        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | grep -o '"tag_name": *"[^"]*"' | grep -o '[^"]*$')
+        API_RESPONSE=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
+        echo "API Response: $API_RESPONSE"
+        LATEST_VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
         
         # 检查是否成功获取版本号
         if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
-            echo "API Response:"
-            curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest
             echo "Failed to get latest version"
             exit 1
         fi
+        
+        # 移除版本号前的 'v' 如果存在
+        LATEST_VERSION=${LATEST_VERSION#v}
         
         CURRENT_VERSION="1.12.2"
         echo "Latest version from API: $LATEST_VERSION"
