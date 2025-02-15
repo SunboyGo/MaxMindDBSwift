@@ -18,7 +18,16 @@ jobs:
       run: |
         # 获取最新版本
         LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        
+        # 检查是否成功获取版本号
+        if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+            echo "Failed to get latest version"
+            exit 1
+        fi
+        
         CURRENT_VERSION="1.12.2"
+        echo "Latest version from API: $LATEST_VERSION"
+        echo "Current version: $CURRENT_VERSION"
         
         if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
           echo "No updates available"
@@ -28,8 +37,24 @@ jobs:
         
         # 克隆并更新源码
         git clone https://github.com/maxmind/libmaxminddb.git temp
+        if [ $? -ne 0 ]; then
+            echo "Failed to clone repository"
+            exit 1
+        fi
+        
         cd temp
+        if [ $? -ne 0 ]; then
+            echo "Failed to change directory"
+            exit 1
+        fi
+        
         git checkout $LATEST_VERSION
+        if [ $? -ne 0 ]; then
+            echo "Failed to checkout version: $LATEST_VERSION"
+            cd ..
+            rm -rf temp
+            exit 1
+        fi
         
         # 删除旧版本
         rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-${CURRENT_VERSION}"
