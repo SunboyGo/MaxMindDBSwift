@@ -31,6 +31,9 @@ jobs:
         cd temp
         git checkout $LATEST_VERSION
         
+        # 删除旧版本
+        rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-${CURRENT_VERSION}"
+        
         # 复制所有必需文件
         mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include"
         mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src"
@@ -67,4 +70,40 @@ jobs:
         echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
         VERSION="1.0.${GITHUB_RUN_NUMBER}"
         echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "update_needed=true" >> $GITHUB_OUTPUT 
+        echo "update_needed=true" >> $GITHUB_OUTPUT
+
+    - name: Test package
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        swift test
+
+    - name: Create Release
+      if: steps.check.outputs.update_needed == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
+        body: |
+          Updated to libmaxminddb version ${{ env.LIBMAXMINDDB_VERSION }}
+          
+          ### Changes
+          - Updated libmaxminddb source code to version ${{ env.LIBMAXMINDDB_VERSION }}
+          
+          ### Installation
+          ```swift
+          dependencies: [
+              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
+          ]
+          ```
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Commit updates
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add Sources/CLibMaxMindDB/
+        git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
+        git tag ${{ env.VERSION }}
+        git push && git push --tags 
