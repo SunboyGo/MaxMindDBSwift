@@ -37,7 +37,9 @@ jobs:
         # 移除版本号前的 'v' 如果存在
         LATEST_VERSION=${LATEST_VERSION#v}
         
-        CURRENT_VERSION="1.12.2"
+        # 从 Package.swift 或 module.modulemap 中获取当前版本
+        CURRENT_VERSION=$(grep -o 'libmaxminddb-[0-9.]*' Sources/CLibMaxMindDB/module.modulemap | head -1 | cut -d'-' -f2)
+        
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
         
