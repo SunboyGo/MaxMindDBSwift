@@ -8,3 +8,4 @@ DerivedData/
 .swiftpm/
 +.version
 +.build-number
+*.zip

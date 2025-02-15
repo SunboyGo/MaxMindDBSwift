@@ -6,211 +6,65 @@ on:
   workflow_dispatch:      # 允许手动触发
 
 jobs:
-  check-and-build:
+  check-and-update:
     runs-on: macos-latest
     
     steps:
     - name: Checkout
       uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-        
-    - name: Delete existing release and tag
-      run: |
-        # 删除远程 tag
-        git push origin :refs/tags/${{ env.VERSION }} || true
-        # 删除本地 tag
-        git tag -d ${{ env.VERSION }} || true
-        # 删除 .version 文件
-        rm -f .version || true
-      continue-on-error: true
-        
+      
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 获取 libmaxminddb 的最新版本
+        # 获取最新版本
         LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
-        
-        # 获取当前使用的版本
         CURRENT_VERSION="1.12.2"
         
-        # 比较版本
         if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
           echo "No updates available"
           echo "update_needed=false" >> $GITHUB_OUTPUT
           exit 0
         fi
         
-        # 有新版本时更新
-        echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
-        echo "update_needed=true" >> $GITHUB_OUTPUT
+        # 克隆并更新源码
+        git clone https://github.com/maxmind/libmaxminddb.git temp
+        cd temp
+        git checkout $LATEST_VERSION
         
-        # 设置其他变量
-        BASE_VERSION="1.0.0"
-        BUILD_NUMBER=${{ github.run_number }}
-        VERSION="${BASE_VERSION}.${BUILD_NUMBER}"
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "new_version=$VERSION" >> $GITHUB_OUTPUT
+        # 复制所有必需文件
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src"
         
-        echo "构建新版本: ${VERSION}"
-
-    - name: Setup build environment
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        brew install automake autoconf libtool
+        # 复制源文件
+        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
+        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
         
-    - name: Create build script
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        # 使用 base64 编码和解码来避免特殊字符问题
-        echo "${{ secrets.BUILD_SCRIPT }}" | base64 -d > build-script.sh
-        chmod +x build-script.sh
-
-    - name: Clone libmaxminddb
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        git clone https://github.com/maxmind/libmaxminddb.git
-        cd libmaxminddb
-        git checkout "${{ env.LIBMAXMINDDB_VERSION }}"
+        # 复制头文件
+        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/"
+        
+        # 复制内部头文件
+        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
+        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
+        
+        # 更新配置文件
+        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/maxminddb_config.h" << EOF
+        #ifndef MAXMINDDB_CONFIG_H
+        #define MAXMINDDB_CONFIG_H
+        
+        #define PACKAGE_VERSION "${LATEST_VERSION#v}"
+        
+        #ifndef _WIN32
+        #define HAVE_MMAP 1
+        #endif
+        
+        #endif
+        EOF
+        
         cd ..
+        rm -rf temp
         
-    - name: Build XCFramework
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        pwd
-        ls -la
-        LIBMAXMINDDB_VERSION="${{ env.LIBMAXMINDDB_VERSION }}" ./build-script.sh
-        
-    - name: Delete existing release if same version
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        # 删除所有相关的版本
-        for tag in $(git tag -l "${BASE_VERSION}*"); do
-          echo "删除 tag: $tag"
-          gh release delete "$tag" -y || true
-          git push origin ":refs/tags/$tag" || true
-          git tag -d "$tag" || true
-        done
-        
-        # 等待 GitHub 处理
-        sleep 15
-        
-        # 强制清理
-        git fetch --prune --prune-tags
-        git gc --prune=now
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Prepare Repository Files
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        # 清理旧文件
-        rm -rf Sources XCFrameworks Package.swift build-script.sh
-        
-        # 复制必要文件
-        mkdir -p Sources Sources/CLibMaxMindDB XCFrameworks
-        cp -R PackageOutput/MaxMindDBSwift/Sources/* Sources/
-        cp -R PackageOutput/MaxMindDBSwift/Sources/CLibMaxMindDB/* Sources/CLibMaxMindDB/
-        cp -R PackageOutput/MaxMindDBSwift/Sources/MaxMindDBSwift/* Sources/MaxMindDBSwift/
-        cp -R PackageOutput/MaxMindDBSwift/XCFrameworks/* XCFrameworks/
-        cp PackageOutput/MaxMindDBSwift/Package.swift ./
-        
-        # 清理构建脚本
-        rm -f build-script.sh
-        
-        # 只添加必要文件
-        git add Sources XCFrameworks Package.swift
-        
-        # 显示当前目录结构
-        echo "当前目录结构："
-        pwd
-        ls -la
-        
-        # 显示 PackageOutput 内容
-        echo "PackageOutput 内容："
-        ls -R PackageOutput/
-        
-        # 设置文件权限
-        sudo chmod -R 755 .
-        sudo chown -R $USER .
-        
-        # 配置 git
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        # 显示将要提交的文件
-        echo "将要提交的文件："
-        git status
-        
-        # 提交更改
-        git commit -m "Update package files for version ${{ env.VERSION }}"
-        
-        # 强制推送到主分支
-        git push origin HEAD:main --force
-        
-        # 验证推送结果
-        echo "验证远程仓库文件："
-        git ls-remote --heads origin main
-
-    - name: Create Git Tag
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        # 确保在最新的提交上创建 tag
-        git fetch --all
-        git checkout main
-        git pull origin main
-        # 创建新的 tag
-        git tag -f ${{ env.VERSION }}
-        # 强制推送 tag
-        git push -f origin ${{ env.VERSION }}
-        # 等待 tag 更新
-        sleep 5
-
-    - name: Prepare Release Assets
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        cd "${PROJECT_ROOT}"
-        cd PackageOutput
-        zip -r ../MaxMindDBSwift-${{ env.VERSION }}.zip MaxMindDBSwift/
-
-    - name: Create Release
-      if: steps.check.outputs.update_needed == 'true'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ env.VERSION }}
-        name: Release ${{ env.VERSION }}
-        files: MaxMindDBSwift-${{ env.VERSION }}.zip
-        body: |
-          Updated to libmaxminddb version ${{ env.VERSION }}
-          
-          ### Installation
-          
-          Add the following to your Package.swift:
-          ```swift
-          dependencies: [
-              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
-          ]
-          ```
-          
-          Or add the package dependency in Xcode:
-          1. File > Add Packages...
-          2. Enter package URL: `https://github.com/SunboyGo/MaxMindDBSwift.git`
-          3. Select "Up to Next Major Version" with "${{ env.VERSION }}"
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Clean Build Files
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        rm -rf MaxMindDBSwift-*.zip
-        rm -rf PackageOutput
-        rm -rf build-script.sh
-        rm -rf install
-        rm -rf libmaxminddb
-        
-    - name: Update Version File
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-      continue-on-error: true 
+        # 设置版本号
+        echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+        VERSION="1.0.${GITHUB_RUN_NUMBER}"
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "update_needed=true" >> $GITHUB_OUTPUT 

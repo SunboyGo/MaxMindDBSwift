@@ -13,20 +13,17 @@ let package = Package(
     targets: [
         .target(
             name: "MaxMindDB",
-            dependencies: [
-                "CLibMaxMindDB",
-                "CLibMaxMindDBXC"
-            ],
+            dependencies: ["CLibMaxMindDB"],
             path: "Sources/MaxMindDBSwift"
         ),
-        .systemLibrary(
+        .target(
             name: "CLibMaxMindDB",
             path: "Sources/CLibMaxMindDB",
-            pkgConfig: "libmaxminddb"
-        ),
-        .binaryTarget(
-            name: "CLibMaxMindDBXC",
-            path: "XCFrameworks/MaxMindDBSwift.xcframework"
+            sources: [
+                "libmaxminddb-1.12.2/src/maxminddb.c",
+                "libmaxminddb-1.12.2/src/data-pool.c"
+            ],
+            publicHeadersPath: "libmaxminddb-1.12.2/include"
         )
     ]
-)
+) 
