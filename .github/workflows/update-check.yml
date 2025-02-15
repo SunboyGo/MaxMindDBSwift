@@ -13,14 +13,21 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
       
+    - name: Install jq
+      run: |
+        brew install jq
+      
     - name: Check libmaxminddb for updates
       id: check
       run: |
         # 获取最新版本
-        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | jq -r .tag_name)
+        echo "Fetching latest version from GitHub API..."
+        LATEST_VERSION=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest | grep -o '"tag_name": *"[^"]*"' | grep -o '[^"]*$')
         
         # 检查是否成功获取版本号
         if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+            echo "API Response:"
+            curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest
             echo "Failed to get latest version"
             exit 1
         fi
@@ -102,6 +109,26 @@ jobs:
       run: |
         swift test
 
+    - name: Update Package.swift and module.modulemap
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        # 更新 Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.]*\/src/libmaxminddb-${LATEST_VERSION#v}\/src/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Package.swift
+        
+        # 更新 module.modulemap
+        sed -i '' "s/libmaxminddb-[0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Sources/CLibMaxMindDB/module.modulemap
+
+    - name: Commit updates
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add Sources/CLibMaxMindDB/ Package.swift
+        git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
+        git tag ${{ env.VERSION }}
+        git push && git push --tags
+
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
       uses: softprops/action-gh-release@v1
@@ -121,14 +148,4 @@ jobs:
           ]
           ```
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Commit updates
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add Sources/CLibMaxMindDB/
-        git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
-        git tag ${{ env.VERSION }}
-        git push && git push --tags 
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
