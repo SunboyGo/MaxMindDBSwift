@@ -117,15 +117,6 @@ jobs:
         
         echo "LATEST_VERSION: $LATEST_VERSION"
         echo "LIBMAXMINDDB_VERSION: $LIBMAXMINDDB_VERSION"
-        echo "Content of Package.swift after update:"
-        cat Package.swift
-        
-        echo "Content of module.modulemap after update:"
-        cat Sources/CLibMaxMindDB/module.modulemap
-        
-        echo "Checking if directories exist:"
-        ls -la Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/
-        ls -la Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/
 
     - name: Commit updates
       if: steps.check.outputs.update_needed == 'true'
