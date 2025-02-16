@@ -1,5 +1,5 @@
 module CLibMaxMindDB {
-    umbrella header "libmaxminddb-1.12.1/include/maxminddb.h"
+    umbrella header "libmaxminddb-1.12.2/include/maxminddb.h"
     export *
     module * { export * }
 }
