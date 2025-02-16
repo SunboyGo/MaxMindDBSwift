@@ -8,9 +8,6 @@ on:
 jobs:
   check-and-update:
     runs-on: macos-latest
-    permissions:
-      contents: write
-      workflows: write    # 添加 workflows 写入权限
     
     steps:
     - name: Checkout
