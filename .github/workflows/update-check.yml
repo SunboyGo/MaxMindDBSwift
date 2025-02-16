@@ -32,7 +32,7 @@ jobs:
         LATEST_VERSION=${LATEST_VERSION#v}
         
         # 使用硬编码的当前版本
-        CURRENT_VERSION="1.12.2"
+        CURRENT_VERSION="1.12.1"
         
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
