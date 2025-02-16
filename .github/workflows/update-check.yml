@@ -146,6 +146,12 @@ jobs:
             \"branch\": \"main\"
           }"
         
+        # 等待 workflow 文件更新完成
+        sleep 5
+        
+        # 拉取最新更改
+        git pull
+        
         # 创建标签
         git tag ${{ env.VERSION }}
         git push --tags
