@@ -177,7 +177,7 @@ jobs:
           ### Installation
           ```swift
           dependencies: [
-              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", exact: "${{ env.VERSION }}")
+              .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
       env:
