@@ -1,6 +1,6 @@
 # MaxMindDBSwift
 
-A high-performance Swift wrapper for the MaxMind GeoIP2 database reader. This library provides an elegant Swift interface to [libmaxminddb](https://github.com/maxmind/libmaxminddb), enabling efficient IP geolocation lookups with type-safe access to the MaxMind database format.
+A high-performance Swift wrapper for MaxMind's GeoIP2 database. This library provides an elegant Swift interface to [libmaxminddb](https://github.com/maxmind/libmaxminddb), offering efficient IP geolocation lookups with type-safe access to MaxMind's MMDB format.
 
 ## Key Features
 
