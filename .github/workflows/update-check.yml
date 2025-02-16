@@ -125,10 +125,30 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add Sources/CLibMaxMindDB/ Package.swift .github/workflows/update-check.yml
+        git add Sources/CLibMaxMindDB/ Package.swift
         git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
+        git push
+        
+        # 使用 GitHub API 更新 workflow 文件
+        WORKFLOW_CONTENT=$(cat .github/workflows/update-check.yml | base64)
+        CURRENT_SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          "https://api.github.com/repos/SunboyGo/MaxMindDBSwift/contents/.github/workflows/update-check.yml" \
+          | jq -r .sha)
+        
+        curl -X PUT \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/SunboyGo/MaxMindDBSwift/contents/.github/workflows/update-check.yml \
+          -d "{
+            \"message\": \"Update workflow version to ${{ env.LIBMAXMINDDB_VERSION }}\",
+            \"content\": \"$WORKFLOW_CONTENT\",
+            \"sha\": \"$CURRENT_SHA\",
+            \"branch\": \"main\"
+          }"
+        
+        # 创建标签
         git tag ${{ env.VERSION }}
-        git push && git push --tags
+        git push --tags
 
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
