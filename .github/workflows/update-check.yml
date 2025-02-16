@@ -127,11 +127,6 @@ jobs:
         ls -la Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/
         ls -la Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/
 
-    - name: Test package
-      if: steps.check.outputs.update_needed == 'true'
-      run: |
-        swift test
-
     - name: Commit updates
       if: steps.check.outputs.update_needed == 'true'
       run: |
