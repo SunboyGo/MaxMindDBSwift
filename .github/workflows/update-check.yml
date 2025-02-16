@@ -120,6 +120,8 @@ jobs:
 
     - name: Commit updates
       if: steps.check.outputs.update_needed == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.PAT }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
@@ -147,4 +149,4 @@ jobs:
           ]
           ```
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        GITHUB_TOKEN: ${{ secrets.PAT }} 
