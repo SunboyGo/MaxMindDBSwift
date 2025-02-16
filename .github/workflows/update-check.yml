@@ -28,17 +28,11 @@ jobs:
         echo "API Response: $API_RESPONSE"
         LATEST_VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
         
-        # 检查是否成功获取版本号
-        if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
-            echo "Failed to get latest version"
-            exit 1
-        fi
-        
         # 移除版本号前的 'v' 如果存在
         LATEST_VERSION=${LATEST_VERSION#v}
         
-        # 从 Package.swift 或 module.modulemap 中获取当前版本
-        CURRENT_VERSION=$(grep -o 'libmaxminddb-[0-9.]*' Sources/CLibMaxMindDB/module.modulemap | head -1 | cut -d'-' -f2)
+        # 使用硬编码的当前版本
+        CURRENT_VERSION="1.12.1"
         
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
@@ -118,6 +112,9 @@ jobs:
         # 更新 module.modulemap
         sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Sources/CLibMaxMindDB/module.modulemap
         
+        # 更新 workflow 文件中的版本号
+        sed -i '' "s/CURRENT_VERSION=\"[0-9.]*\"/CURRENT_VERSION=\"${LATEST_VERSION#v}\"/g" .github/workflows/update-check.yml
+        
         echo "LATEST_VERSION: $LATEST_VERSION"
         echo "LIBMAXMINDDB_VERSION: $LIBMAXMINDDB_VERSION"
         echo "Content of Package.swift after update:"
@@ -140,7 +137,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add Sources/CLibMaxMindDB/ Package.swift
+        git add Sources/CLibMaxMindDB/ Package.swift .github/workflows/update-check.yml
         git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
         git tag ${{ env.VERSION }}
         git push && git push --tags
