@@ -149,8 +149,14 @@ jobs:
         # 等待 workflow 文件更新完成
         sleep 5
         
+        # 保存本地更改
+        git stash
+        
         # 拉取最新更改
         git pull
+        
+        # 恢复本地更改
+        git stash pop
         
         # 创建标签
         git tag ${{ env.VERSION }}
