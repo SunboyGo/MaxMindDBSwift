@@ -1,0 +1,32 @@
+name: Build Swift Package
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-package:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Create build script
+      env:
+        BUILD_SCRIPT: ${{ secrets.BUILD_SCRIPT }}
+      run: |
+        echo "$BUILD_SCRIPT" > ./build.sh
+        chmod +x ./build.sh
+      
+    - name: Run build script
+      run: |
+        ./build.sh
+        rm ./build.sh  
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: swift-package
+        path: PackageOutput/

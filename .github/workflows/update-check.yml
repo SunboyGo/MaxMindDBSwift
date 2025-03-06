@@ -68,26 +68,26 @@ jobs:
         rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-${CURRENT_VERSION}"
         
         # 复制所有必需文件
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include"
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src"
         
         # 复制源文件
-        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
-        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
+        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
+        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
         
         # 复制头文件
-        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/"
+        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include/"
         
         # 复制内部头文件
-        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
-        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/src/"
+        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
+        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
         
         # 更新配置文件
-        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION#v}/include/maxminddb_config.h" << EOF
+        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include/maxminddb_config.h" << EOF
         #ifndef MAXMINDDB_CONFIG_H
         #define MAXMINDDB_CONFIG_H
         
-        #define PACKAGE_VERSION "${LATEST_VERSION#v}"
+        #define PACKAGE_VERSION "${LATEST_VERSION}"
         
         #ifndef _WIN32
         #define HAVE_MMAP 1
@@ -106,14 +106,11 @@ jobs:
         echo "update_needed=true" >> $GITHUB_OUTPUT
         
         # 更新 Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${LATEST_VERSION#v}\/src/g" Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${LATEST_VERSION}\/src/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION}\/include/g" Package.swift
         
         # 更新 module.modulemap
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION#v}\/include/g" Sources/CLibMaxMindDB/module.modulemap
-        
-        # 更新 workflow 文件中的版本号
-        sed -i '' "s/CURRENT_VERSION=\"[0-9.]*\"/CURRENT_VERSION=\"${LATEST_VERSION#v}\"/g" .github/workflows/update-check.yml
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION}\/include/g" Sources/CLibMaxMindDB/module.modulemap
         
         echo "LATEST_VERSION: $LATEST_VERSION"
         echo "LIBMAXMINDDB_VERSION: $LIBMAXMINDDB_VERSION"
@@ -128,35 +125,6 @@ jobs:
         git add Sources/CLibMaxMindDB/ Package.swift
         git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
         git push
-        
-        # 使用 GitHub API 更新 workflow 文件
-        WORKFLOW_CONTENT=$(cat .github/workflows/update-check.yml | base64)
-        CURRENT_SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          "https://api.github.com/repos/SunboyGo/MaxMindDBSwift/contents/.github/workflows/update-check.yml" \
-          | jq -r .sha)
-        
-        curl -X PUT \
-          -H "Authorization: token $GITHUB_TOKEN" \
-          -H "Accept: application/vnd.github.v3+json" \
-          https://api.github.com/repos/SunboyGo/MaxMindDBSwift/contents/.github/workflows/update-check.yml \
-          -d "{
-            \"message\": \"Update workflow version to ${{ env.LIBMAXMINDDB_VERSION }}\",
-            \"content\": \"$WORKFLOW_CONTENT\",
-            \"sha\": \"$CURRENT_SHA\",
-            \"branch\": \"main\"
-          }"
-        
-        # 等待 workflow 文件更新完成
-        sleep 5
-        
-        # 保存本地更改
-        git stash
-        
-        # 拉取最新更改
-        git pull
-        
-        # 恢复本地更改
-        git stash pop
         
         # 创建标签
         git tag ${{ env.VERSION }}
@@ -181,4 +149,4 @@ jobs:
           ]
           ```
       env:
-        GITHUB_TOKEN: ${{ secrets.PAT }} 
+        GITHUB_TOKEN: ${{ secrets.PAT }}
