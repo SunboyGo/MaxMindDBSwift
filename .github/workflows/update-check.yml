@@ -10,8 +10,11 @@ jobs:
     runs-on: macos-latest
     
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+    - name: Checkout with token
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT }}  # 使用PAT确保有推送标签的权限
+        fetch-depth: 0  # 获取完整历史
       
     - name: Install jq
       run: |
@@ -25,14 +28,22 @@ jobs:
         # 获取最新版本
         echo "Fetching latest version from GitHub API..."
         API_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
-        echo "API Response: $API_RESPONSE"
-        LATEST_VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+        echo "API Response received"
+        
+        # 使用jq解析JSON (比grep更可靠)
+        if echo "$API_RESPONSE" | jq -e . > /dev/null 2>&1; then
+          LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r .tag_name)
+        else
+          echo "Error: Invalid JSON response from API"
+          echo "Response: $API_RESPONSE"
+          exit 1
+        fi
         
         # 移除版本号前的 'v' 如果存在
         LATEST_VERSION=${LATEST_VERSION#v}
         
-        # 使用硬编码的当前版本
-        CURRENT_VERSION="1.12.1"
+        # 使用当前版本
+        CURRENT_VERSION="1.12.1"  
         
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
@@ -45,24 +56,8 @@ jobs:
         
         # 克隆并更新源码
         git clone https://github.com/maxmind/libmaxminddb.git temp
-        if [ $? -ne 0 ]; then
-            echo "Failed to clone repository"
-            exit 1
-        fi
-        
         cd temp
-        if [ $? -ne 0 ]; then
-            echo "Failed to change directory"
-            exit 1
-        fi
-        
         git checkout $LATEST_VERSION
-        if [ $? -ne 0 ]; then
-            echo "Failed to checkout version: $LATEST_VERSION"
-            cd ..
-            rm -rf temp
-            exit 1
-        fi
         
         # 删除旧版本
         rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-${CURRENT_VERSION}"
@@ -111,31 +106,47 @@ jobs:
         
         # 更新 module.modulemap
         sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION}\/include/g" Sources/CLibMaxMindDB/module.modulemap
-        
-        echo "LATEST_VERSION: $LATEST_VERSION"
-        echo "LIBMAXMINDDB_VERSION: $LIBMAXMINDDB_VERSION"
 
-    - name: Commit updates
+    - name: Run build script
+      if: steps.check.outputs.update_needed == 'true'
+      env:
+        BUILD_SCRIPT: ${{ secrets.BUILD_SCRIPT }}
+      run: |
+        # 创建并运行构建脚本
+        echo "$BUILD_SCRIPT" > ./build.sh
+        chmod +x ./build.sh
+        ./build.sh
+        rm ./build.sh  # 删除脚本防止泄露
+
+    - name: Commit and tag
       if: steps.check.outputs.update_needed == 'true'
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add Sources/CLibMaxMindDB/ Package.swift
-        git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
-        git push
         
-        # 创建标签
-        git tag ${{ env.VERSION }}
+        # 添加所有更改
+        git add -A
+        
+        # 提交更改
+        git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
+        
+        # 创建带v前缀的标签
+        git tag "v${{ env.VERSION }}"
+        
+        # 推送提交和标签 (使用PAT确保权限)
+        git push
         git push --tags
+        
+        echo "Changes committed and pushed. Tagged version v${{ env.VERSION }}"
 
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ env.VERSION }}
-        name: Release ${{ env.VERSION }}
+        tag_name: v${{ env.VERSION }}
+        name: Release v${{ env.VERSION }}
         body: |
           Updated to libmaxminddb version ${{ env.LIBMAXMINDDB_VERSION }}
           
@@ -148,5 +159,8 @@ jobs:
               .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
+        files: PackageOutput/**/*
+        draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
