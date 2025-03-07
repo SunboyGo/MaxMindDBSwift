@@ -198,11 +198,31 @@ jobs:
       env:
         BUILD_SCRIPT: ${{ secrets.BUILD_SCRIPT }}
       run: |
+        # 创建临时目录
+        mkdir -p build_output
+        cd build_output
+        
         # 创建并运行构建脚本
         echo "$BUILD_SCRIPT" > ./build.sh
         chmod +x ./build.sh
         ./build.sh
-        rm ./build.sh  # 删除脚本防止泄露
+        
+        # 如果生成了嵌套的 MaxMindDBSwift 目录，将内容复制到正确位置
+        if [ -d "MaxMindDBSwift" ]; then
+          echo "Copying files from nested directory to root..."
+          # 复制文件到仓库根目录
+          cp -R MaxMindDBSwift/* ../
+        fi
+        
+        # 返回根目录并清理
+        cd ..
+        rm -rf build_output
+        
+        # 检查是否有嵌套目录
+        if [ -d "MaxMindDBSwift" ]; then
+          echo "Removing nested MaxMindDBSwift directory..."
+          rm -rf MaxMindDBSwift
+        fi
 
     - name: Commit changes
       if: steps.check.outputs.update_needed == 'true'
@@ -256,7 +276,6 @@ jobs:
               .package(url: "https://github.com/SunboyGo/MaxMindDBSwift.git", from: "${{ env.VERSION }}")
           ]
           ```
-        files: PackageOutput/**/*
         draft: false
         prerelease: false
       env:
