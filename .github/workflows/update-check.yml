@@ -26,7 +26,7 @@ jobs:
         GH_TOKEN: ${{ secrets.PAT }}  # 使用PAT进行API请求身份验证
       run: |
         # 当前使用的版本
-        CURRENT_VERSION="1.12.2"  # 请更新为您当前使用的版本
+        CURRENT_VERSION="1.12.1"  
         
         # 获取最新版本 - 使用授权请求避免API限制
         echo "Fetching latest version from GitHub API..."
