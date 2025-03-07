@@ -22,14 +22,20 @@ jobs:
       
     - name: Check libmaxminddb for updates
       id: check
+      env:
+        GH_TOKEN: ${{ secrets.PAT }}  # 使用PAT进行API请求身份验证
       run: |
         # 当前使用的版本
         CURRENT_VERSION="1.12.2"  # 请更新为您当前使用的版本
         
-        # 获取最新版本
+        # 获取最新版本 - 使用授权请求避免API限制
         echo "Fetching latest version from GitHub API..."
-        API_RESPONSE=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
+        API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
         echo "API Response received"
+        
+        # 打印完整API响应用于调试（脱敏）
+        echo "API Response preview (first 100 chars):"
+        echo "${API_RESPONSE:0:100}..."
         
         # 检查API响应是否为空
         if [ -z "$API_RESPONSE" ]; then
@@ -49,7 +55,8 @@ jobs:
           fi
         else
           echo "Error: Could not find tag_name in API response"
-          echo "Response: $API_RESPONSE"
+          echo "Response contains these keys:"
+          echo "$API_RESPONSE" | jq 'keys'
           exit 1
         fi
         
@@ -111,6 +118,8 @@ jobs:
 
     - name: Update source files
       if: steps.check.outputs.update_needed == 'true'
+      env:
+        GH_TOKEN: ${{ secrets.PAT }}  # 添加身份验证令牌
       run: |
         # 再次验证 LIBMAXMINDDB_VERSION 不为空
         if [ -z "$LIBMAXMINDDB_VERSION" ] || [ "$LIBMAXMINDDB_VERSION" = "null" ]; then
@@ -120,8 +129,8 @@ jobs:
         
         echo "Using libmaxminddb version: $LIBMAXMINDDB_VERSION"
         
-        # 克隆并更新源码
-        git clone https://github.com/maxmind/libmaxminddb.git temp
+        # 克隆并更新源码 - 使用授权以避免限制
+        git clone https://x-access-token:${GH_TOKEN}@github.com/maxmind/libmaxminddb.git temp
         cd temp
         git fetch --tags
         
@@ -133,8 +142,13 @@ jobs:
           echo "Checking out tag $LIBMAXMINDDB_VERSION"
           git checkout "$LIBMAXMINDDB_VERSION"
         else
-          echo "Error: Tag not found for version $LIBMAXMINDDB_VERSION"
-          exit 1
+          echo "Tag not found for version $LIBMAXMINDDB_VERSION"
+          echo "Available tags:"
+          git tag | grep -E "v?$LIBMAXMINDDB_VERSION" || echo "No matching tags"
+          
+          # 尝试使用最新的提交
+          echo "Trying to use latest commit instead..."
+          git checkout main || git checkout master
         fi
         
         # 删除旧版本
