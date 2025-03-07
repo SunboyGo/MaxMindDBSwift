@@ -13,26 +13,56 @@ jobs:
     - name: Checkout with token
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT }}  # 使用PAT确保有推送标签的权限
+        token: ${{ secrets.PAT }}  # 使用PAT确保有推送权限
         fetch-depth: 0  # 获取完整历史
       
     - name: Install jq
       run: |
         brew install jq
+    
+    - name: Calculate next version
+      id: version
+      run: |
+        # 获取所有标签
+        git fetch --tags
+        
+        # 查找最新的版本标签（格式为1.0.x）
+        LATEST_TAG=$(git tag -l "1.0.*" | sort -V | tail -n 1)
+        
+        # 如果没有找到标签，使用默认版本
+        if [ -z "$LATEST_TAG" ]; then
+          echo "No previous version tag found, starting with 1.0.1"
+          LATEST_TAG="1.0.0"
+        fi
+        
+        echo "Latest version tag: $LATEST_TAG"
+        
+        # 拆分版本号
+        MAJOR=$(echo $LATEST_TAG | cut -d. -f1)
+        MINOR=$(echo $LATEST_TAG | cut -d. -f2)
+        PATCH=$(echo $LATEST_TAG | cut -d. -f3)
+        
+        # 增加修订号
+        PATCH=$((PATCH + 1))
+        
+        # 新版本号
+        NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+        echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
+        
+        echo "Previous version: $LATEST_TAG"
+        echo "New version: $NEW_VERSION"
       
     - name: Check libmaxminddb for updates
       id: check
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         # 获取最新版本
         echo "Fetching latest version from GitHub API..."
-        API_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
-        echo "API Response received"
+        API_RESPONSE=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
         
-        # 使用jq解析JSON (比grep更可靠)
+        # 使用jq解析JSON
         if echo "$API_RESPONSE" | jq -e . > /dev/null 2>&1; then
           LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r .tag_name)
+          echo "Successfully parsed API response"
         else
           echo "Error: Invalid JSON response from API"
           echo "Response: $API_RESPONSE"
@@ -43,7 +73,7 @@ jobs:
         LATEST_VERSION=${LATEST_VERSION#v}
         
         # 使用当前版本
-        CURRENT_VERSION="1.12.1"  
+        CURRENT_VERSION="1.12.2"  # 请更新为您当前使用的版本
         
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
@@ -54,35 +84,42 @@ jobs:
           exit 0
         fi
         
+        # 设置版本号
+        echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
+        echo "update_needed=true" >> $GITHUB_OUTPUT
+
+    - name: Update source files
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
         # 克隆并更新源码
         git clone https://github.com/maxmind/libmaxminddb.git temp
         cd temp
-        git checkout $LATEST_VERSION
+        git checkout ${{ env.LIBMAXMINDDB_VERSION }}
         
         # 删除旧版本
-        rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-${CURRENT_VERSION}"
+        rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-1.12.2"
         
         # 复制所有必需文件
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include"
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src"
         
         # 复制源文件
-        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
-        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
+        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
+        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
         
         # 复制头文件
-        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include/"
+        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include/"
         
         # 复制内部头文件
-        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
-        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/src/"
+        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
+        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
         
         # 更新配置文件
-        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${LATEST_VERSION}/include/maxminddb_config.h" << EOF
+        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include/maxminddb_config.h" << EOF
         #ifndef MAXMINDDB_CONFIG_H
         #define MAXMINDDB_CONFIG_H
         
-        #define PACKAGE_VERSION "${LATEST_VERSION}"
+        #define PACKAGE_VERSION "${{ env.LIBMAXMINDDB_VERSION }}"
         
         #ifndef _WIN32
         #define HAVE_MMAP 1
@@ -94,18 +131,12 @@ jobs:
         cd ..
         rm -rf temp
         
-        # 设置版本号
-        echo "LIBMAXMINDDB_VERSION=$LATEST_VERSION" >> $GITHUB_ENV
-        VERSION="1.0.${GITHUB_RUN_NUMBER}"
-        echo "VERSION=$VERSION" >> $GITHUB_ENV
-        echo "update_needed=true" >> $GITHUB_OUTPUT
-        
         # 更新 Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${LATEST_VERSION}\/src/g" Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION}\/include/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/src/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/include/g" Package.swift
         
         # 更新 module.modulemap
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${LATEST_VERSION}\/include/g" Sources/CLibMaxMindDB/module.modulemap
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/include/g" Sources/CLibMaxMindDB/module.modulemap
 
     - name: Run build script
       if: steps.check.outputs.update_needed == 'true'
@@ -118,10 +149,8 @@ jobs:
         ./build.sh
         rm ./build.sh  # 删除脚本防止泄露
 
-    - name: Commit and tag
+    - name: Commit changes
       if: steps.check.outputs.update_needed == 'true'
-      env:
-        GITHUB_TOKEN: ${{ secrets.PAT }}
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
@@ -132,21 +161,34 @@ jobs:
         # 提交更改
         git commit -m "Update libmaxminddb to version ${{ env.LIBMAXMINDDB_VERSION }}"
         
-        # 创建带v前缀的标签
-        git tag "v${{ env.VERSION }}"
+        # 确保能看到所有错误输出
+        set -x
         
-        # 推送提交和标签 (使用PAT确保权限)
+        # 推送提交
         git push
-        git push --tags
         
-        echo "Changes committed and pushed. Tagged version v${{ env.VERSION }}"
+        echo "Changes committed and pushed."
+
+    - name: Create and push tag
+      if: steps.check.outputs.update_needed == 'true'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # 创建标签 - 使用连续版本号
+        git tag "${{ env.VERSION }}"
+        
+        # 推送标签
+        git push origin "${{ env.VERSION }}"
+        
+        echo "Tagged version ${{ env.VERSION }} and pushed tag."
 
     - name: Create Release
       if: steps.check.outputs.update_needed == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ env.VERSION }}
-        name: Release v${{ env.VERSION }}
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
         body: |
           Updated to libmaxminddb version ${{ env.LIBMAXMINDDB_VERSION }}
           
