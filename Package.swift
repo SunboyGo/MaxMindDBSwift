@@ -20,10 +20,10 @@ let package = Package(
             name: "CLibMaxMindDB",
             path: "Sources/CLibMaxMindDB",
             sources: [
-                "libmaxminddb-1.12.2/src/maxminddb.c",
-                "libmaxminddb-1.12.2/src/data-pool.c"
+                "libmaxminddb-1.12.1/src/maxminddb.c",
+                "libmaxminddb-1.12.1/src/data-pool.c"
             ],
-            publicHeadersPath: "libmaxminddb-1.12.2/include"
+            publicHeadersPath: "libmaxminddb-1.12.1/include"
         )
     ]
 ) 
