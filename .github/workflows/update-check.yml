@@ -55,25 +55,30 @@ jobs:
     - name: Check libmaxminddb for updates
       id: check
       run: |
-        # 获取最新版本
+        # 使用当前版本
+        CURRENT_VERSION="1.12.2"  
+        
+        # 获取最新版本，添加错误处理
         echo "Fetching latest version from GitHub API..."
         API_RESPONSE=$(curl -s https://api.github.com/repos/maxmind/libmaxminddb/releases/latest)
         
-        # 使用jq解析JSON
-        if echo "$API_RESPONSE" | jq -e . > /dev/null 2>&1; then
-          LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r .tag_name)
+        # 尝试解析JSON并提取版本号
+        if echo "$API_RESPONSE" | jq -e '.tag_name' > /dev/null 2>&1; then
+          LATEST_VERSION=$(echo "$API_RESPONSE" | jq -r '.tag_name')
+          # 移除版本号前的'v'如果存在
+          LATEST_VERSION=${LATEST_VERSION#v}
           echo "Successfully parsed API response"
         else
-          echo "Error: Invalid JSON response from API"
-          echo "Response: $API_RESPONSE"
-          exit 1
+          echo "Failed to parse API response, using current version as fallback"
+          LATEST_VERSION=$CURRENT_VERSION
+          echo "API Response: $API_RESPONSE"
         fi
         
-        # 移除版本号前的 'v' 如果存在
-        LATEST_VERSION=${LATEST_VERSION#v}
-        
-        # 使用当前版本
-        CURRENT_VERSION="1.12.2"  # 请更新为您当前使用的版本
+        # 确保版本号有效
+        if [ -z "$LATEST_VERSION" ] || [ "$LATEST_VERSION" = "null" ]; then
+          echo "Invalid version detected, using current version"
+          LATEST_VERSION=$CURRENT_VERSION
+        fi
         
         echo "Latest version from API: $LATEST_VERSION"
         echo "Current version: $CURRENT_VERSION"
@@ -91,52 +96,80 @@ jobs:
     - name: Update source files
       if: steps.check.outputs.update_needed == 'true'
       run: |
+        # 验证版本号
+        if [ -z "$LIBMAXMINDDB_VERSION" ] || [ "$LIBMAXMINDDB_VERSION" = "null" ]; then
+          echo "Error: Invalid version number. Exiting."
+          exit 1
+        fi
+        
+        echo "Updating to libmaxminddb version: $LIBMAXMINDDB_VERSION"
+        
         # 克隆并更新源码
         git clone https://github.com/maxmind/libmaxminddb.git temp
         cd temp
-        git checkout ${{ env.LIBMAXMINDDB_VERSION }}
+        
+        # 尝试不同的标签格式
+        if git tag -l | grep -q "^$LIBMAXMINDDB_VERSION$"; then
+          echo "Checking out tag: $LIBMAXMINDDB_VERSION"
+          git checkout "$LIBMAXMINDDB_VERSION"
+        elif git tag -l | grep -q "^v$LIBMAXMINDDB_VERSION$"; then
+          echo "Checking out tag: v$LIBMAXMINDDB_VERSION"
+          git checkout "v$LIBMAXMINDDB_VERSION"
+        else
+          echo "Tag not found, attempting to use as branch or commit"
+          git checkout "$LIBMAXMINDDB_VERSION" || {
+            echo "Error: Failed to checkout version $LIBMAXMINDDB_VERSION. Using main branch."
+            git checkout main
+          }
+        fi
         
         # 删除旧版本
         rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-1.12.2"
         
         # 复制所有必需文件
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include"
-        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include"
+        mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src"
         
-        # 复制源文件
-        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
-        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
+        # 复制源文件并检查是否成功
+        cp src/maxminddb.c "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/" || {
+          echo "Error: Failed to copy maxminddb.c. Exiting."
+          cd ..
+          rm -rf temp
+          exit 1
+        }
+        
+        cp src/data-pool.c "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/"
         
         # 复制头文件
-        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include/"
+        cp include/maxminddb.h "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include/"
         
         # 复制内部头文件
-        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
-        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/src/"
+        cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/"
+        cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/"
         
         # 更新配置文件
-        cat > "../Sources/CLibMaxMindDB/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}/include/maxminddb_config.h" << EOF
-        #ifndef MAXMINDDB_CONFIG_H
-        #define MAXMINDDB_CONFIG_H
-        
-        #define PACKAGE_VERSION "${{ env.LIBMAXMINDDB_VERSION }}"
-        
-        #ifndef _WIN32
-        #define HAVE_MMAP 1
-        #endif
-        
-        #endif
-        EOF
+        cat > "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include/maxminddb_config.h" << EOF
+#ifndef MAXMINDDB_CONFIG_H
+#define MAXMINDDB_CONFIG_H
+
+#define PACKAGE_VERSION "$LIBMAXMINDDB_VERSION"
+
+#ifndef _WIN32
+#define HAVE_MMAP 1
+#endif
+
+#endif
+EOF
         
         cd ..
         rm -rf temp
         
         # 更新 Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/src/g" Package.swift
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/include/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/src/libmaxminddb-$LIBMAXMINDDB_VERSION\/src/g" Package.swift
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-$LIBMAXMINDDB_VERSION\/include/g" Package.swift
         
         # 更新 module.modulemap
-        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-${{ env.LIBMAXMINDDB_VERSION }}\/include/g" Sources/CLibMaxMindDB/module.modulemap
+        sed -i '' "s/libmaxminddb-[0-9.][0-9.]*\/include/libmaxminddb-$LIBMAXMINDDB_VERSION\/include/g" Sources/CLibMaxMindDB/module.modulemap
 
     - name: Run build script
       if: steps.check.outputs.update_needed == 'true'
