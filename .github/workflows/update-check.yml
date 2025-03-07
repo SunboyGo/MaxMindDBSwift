@@ -129,6 +129,10 @@ jobs:
         
         echo "Using libmaxminddb version: $LIBMAXMINDDB_VERSION"
         
+        # 删除所有旧版本
+        echo "Cleaning up all previous versions..."
+        find "Sources/CLibMaxMindDB" -type d -name "libmaxminddb-*" -exec rm -rf {} + 2>/dev/null || true
+        
         # 克隆并更新源码 - 使用授权以避免限制
         git clone https://x-access-token:${GH_TOKEN}@github.com/maxmind/libmaxminddb.git temp
         cd temp
@@ -150,9 +154,6 @@ jobs:
           echo "Trying to use latest commit instead..."
           git checkout main || git checkout master
         fi
-        
-        # 删除旧版本
-        rm -rf "../Sources/CLibMaxMindDB/libmaxminddb-1.12.2"
         
         # 复制所有必需文件
         mkdir -p "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include"
@@ -223,6 +224,15 @@ jobs:
           echo "Removing nested MaxMindDBSwift directory..."
           rm -rf MaxMindDBSwift
         fi
+        
+        # 再次清理所有冗余版本
+        echo "Final cleanup of redundant versions..."
+        # 获取当前被使用的版本号
+        USED_VERSION=$(grep -o 'libmaxminddb-[0-9.]*' Package.swift | head -1 | cut -d'-' -f2)
+        echo "Current version in use: $USED_VERSION"
+        
+        # 删除所有不是当前版本的目录
+        find "Sources/CLibMaxMindDB" -type d -name "libmaxminddb-*" | grep -v "libmaxminddb-$USED_VERSION" | xargs rm -rf
 
     - name: Commit changes
       if: steps.check.outputs.update_needed == 'true'
