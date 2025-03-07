@@ -56,7 +56,7 @@ jobs:
       id: check
       run: |
         # 使用当前版本
-        CURRENT_VERSION="1.12.2"  
+        CURRENT_VERSION="1.12.2"  # 请更新为您当前使用的版本
         
         # 获取最新版本，添加错误处理
         echo "Fetching latest version from GitHub API..."
@@ -147,8 +147,8 @@ jobs:
         cp src/data-pool.h "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/"
         cp src/maxminddb-compat-util.h "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/src/"
         
-        # 更新配置文件
-        cat > "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include/maxminddb_config.h" << EOF
+        # 更新配置文件 - 修复多行字符串定义
+        cat > "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include/maxminddb_config.h" << 'EOF'
 #ifndef MAXMINDDB_CONFIG_H
 #define MAXMINDDB_CONFIG_H
 
@@ -160,6 +160,8 @@ jobs:
 
 #endif
 EOF
+        # 替换环境变量
+        sed -i '' "s/\$LIBMAXMINDDB_VERSION/$LIBMAXMINDDB_VERSION/g" "../Sources/CLibMaxMindDB/libmaxminddb-$LIBMAXMINDDB_VERSION/include/maxminddb_config.h"
         
         cd ..
         rm -rf temp
