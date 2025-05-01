@@ -481,37 +481,29 @@ public final class GeoIP2 {
         guard let str = data.utf8_string else {
             return ""
         }
-        
+
         let dataSize = Int(data.data_size)
-        
+
+        let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
+        let buffer = UnsafeBufferPointer(start: uint8Ptr, count: dataSize)
+
         // For short strings, try to get from cache
+        let stringData = Data(buffer: buffer)
+
         if dataSize < 100 {
-            // Create UInt8 buffer
-            let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
-            let buffer = UnsafeBufferPointer(start: uint8Ptr, count: dataSize)
-            
-            if let stringData = Data(buffer: buffer) as NSData? {
-                let hashValue = stringData.hashValue
-                let hashKey = NSString(format: "%d", hashValue)
-                
+            if let nsString = NSString(data: stringData as Data, encoding: String.Encoding.utf8.rawValue) {
                 // Check cache
-                if let cachedString = stringCache.object(forKey: hashKey) {
+                if let cachedString = stringCache.object(forKey: nsString) {
                     return cachedString as String
                 }
-                
-                // Create new string and cache it
-                if let string = String(bytes: buffer, encoding: .utf8) {
-                    let nsString = string as NSString
-                    stringCache.setObject(nsString, forKey: hashKey)
-                    return string
-                }
+                // Cache and return
+                stringCache.setObject(nsString, forKey: nsString)
+                return nsString as String
             }
         }
-        
+
         // For long strings or cache misses, create directly
-        let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
-        guard let string = String(bytes: UnsafeBufferPointer(start: uint8Ptr, count: dataSize),
-                                encoding: .utf8) else {
+        guard let string = String(data: stringData as Data, encoding: .utf8) else {
             return ""
         }
         return string
