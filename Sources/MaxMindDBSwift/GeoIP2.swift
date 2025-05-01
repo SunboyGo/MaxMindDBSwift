@@ -160,8 +160,6 @@ public final class GeoIP2 {
     private let mmdb: UnsafeMutablePointer<MMDB_s>
     /// Queue for thread safety
     private let queue = DispatchQueue(label: "com.geoip.queue", attributes: .concurrent)
-    /// String cache to reduce memory usage
-    private let stringCache = NSCache<NSString, NSString>()
     
     /// Initialize a GeoIP2 instance
     /// - Parameter databasePath: Path to the database file
@@ -181,9 +179,6 @@ public final class GeoIP2 {
         }
         
         self.mmdb = mmdbPtr
-        
-        // Configure string cache
-        stringCache.countLimit = 1000 // Limit cache entries
     }
     
     /// Synchronously lookup IP address information
@@ -481,29 +476,10 @@ public final class GeoIP2 {
         guard let str = data.utf8_string else {
             return ""
         }
-
         let dataSize = Int(data.data_size)
+        let stringData = Data(bytes: str, count: dataSize)
 
-        let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
-        let buffer = UnsafeBufferPointer(start: uint8Ptr, count: dataSize)
-
-        // For short strings, try to get from cache
-        let stringData = Data(buffer: buffer)
-
-        if dataSize < 100 {
-            if let nsString = NSString(data: stringData as Data, encoding: String.Encoding.utf8.rawValue) {
-                // Check cache
-                if let cachedString = stringCache.object(forKey: nsString) {
-                    return cachedString as String
-                }
-                // Cache and return
-                stringCache.setObject(nsString, forKey: nsString)
-                return nsString as String
-            }
-        }
-
-        // For long strings or cache misses, create directly
-        guard let string = String(data: stringData as Data, encoding: .utf8) else {
+        guard let string = String(data: stringData, encoding: .utf8) else {
             return ""
         }
         return string
