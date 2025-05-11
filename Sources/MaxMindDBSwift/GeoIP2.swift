@@ -160,8 +160,6 @@ public final class GeoIP2 {
     private let mmdb: UnsafeMutablePointer<MMDB_s>
     /// Queue for thread safety
     private let queue = DispatchQueue(label: "com.geoip.queue", attributes: .concurrent)
-    /// String cache to reduce memory usage
-    private let stringCache = NSCache<NSString, NSString>()
     
     /// Initialize a GeoIP2 instance
     /// - Parameter databasePath: Path to the database file
@@ -181,9 +179,6 @@ public final class GeoIP2 {
         }
         
         self.mmdb = mmdbPtr
-        
-        // Configure string cache
-        stringCache.countLimit = 1000 // Limit cache entries
     }
     
     /// Synchronously lookup IP address information
@@ -191,35 +186,33 @@ public final class GeoIP2 {
     /// - Returns: Query result
     /// - Throws: GeoIP2Error if lookup fails
     public func lookup(ip: String) throws -> GeoIP2Result {
-        try queue.sync {
-            try ip.withCString { cString in
-                var gai_error: Int32 = 0
-                var mmdb_error: Int32 = 0
-                
-                // Execute query
-                let result = MMDB_lookup_string(mmdb, cString, &gai_error, &mmdb_error)
-                
-                // Check MMDB error
-                if mmdb_error != MMDB_SUCCESS {
-                    throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: nil)
-                }
-                
-                // Check network error
-                if gai_error != 0 {
-                    throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: gai_error)
-                }
-                
-                // If no entry is found, return empty result
-                guard result.found_entry else {
-                    return GeoIP2Result(data: [:])
-                }
-                
-                // Parse complete data
-                var entry = result.entry
-                let fullData = try parseFullData(entry: &entry)
-                
-                return GeoIP2Result(data: fullData)
+        try ip.withCString { cString in
+            var gai_error: Int32 = 0
+            var mmdb_error: Int32 = 0
+
+            // Execute query
+            let result = MMDB_lookup_string(mmdb, cString, &gai_error, &mmdb_error)
+
+            // Check MMDB error
+            if mmdb_error != MMDB_SUCCESS {
+                throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: nil)
             }
+
+            // Check network error
+            if gai_error != 0 {
+                throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: gai_error)
+            }
+
+            // If no entry is found, return empty result
+            guard result.found_entry else {
+                return GeoIP2Result(data: [:])
+            }
+
+            // Parse complete data
+            var entry = result.entry
+            let fullData = try parseFullData(entry: &entry)
+
+            return GeoIP2Result(data: fullData)
         }
     }
     
@@ -481,37 +474,10 @@ public final class GeoIP2 {
         guard let str = data.utf8_string else {
             return ""
         }
-        
         let dataSize = Int(data.data_size)
-        
-        // For short strings, try to get from cache
-        if dataSize < 100 {
-            // Create UInt8 buffer
-            let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
-            let buffer = UnsafeBufferPointer(start: uint8Ptr, count: dataSize)
-            
-            if let stringData = Data(buffer: buffer) as NSData? {
-                let hashValue = stringData.hashValue
-                let hashKey = NSString(format: "%d", hashValue)
-                
-                // Check cache
-                if let cachedString = stringCache.object(forKey: hashKey) {
-                    return cachedString as String
-                }
-                
-                // Create new string and cache it
-                if let string = String(bytes: buffer, encoding: .utf8) {
-                    let nsString = string as NSString
-                    stringCache.setObject(nsString, forKey: hashKey)
-                    return string
-                }
-            }
-        }
-        
-        // For long strings or cache misses, create directly
-        let uint8Ptr = UnsafeRawPointer(str).assumingMemoryBound(to: UInt8.self)
-        guard let string = String(bytes: UnsafeBufferPointer(start: uint8Ptr, count: dataSize),
-                                encoding: .utf8) else {
+        let stringData = Data(bytes: str, count: dataSize)
+
+        guard let string = String(data: stringData, encoding: .utf8) else {
             return ""
         }
         return string
@@ -521,23 +487,21 @@ public final class GeoIP2 {
     /// - Returns: Database metadata dictionary
     /// - Throws: GeoIP2Error if retrieval fails
     public func metadata() throws -> [String: Any] {
-        return try queue.sync {
-            var entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
-            let status = MMDB_get_metadata_as_entry_data_list(mmdb, &entryList)
-            
-            // Ensure resources are released
-            defer {
-                if let list = entryList {
-                    MMDB_free_entry_data_list(list)
-                }
+        var entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
+        let status = MMDB_get_metadata_as_entry_data_list(mmdb, &entryList)
+
+        // Ensure resources are released
+        defer {
+            if let list = entryList {
+                MMDB_free_entry_data_list(list)
             }
-            
-            guard status == MMDB_SUCCESS, let list = entryList else {
-                throw GeoIP2Error.dataParsingFailed(reason: "Failed to get metadata")
-            }
-            
-            return try parseEntryDataList(entryList: list)
         }
+
+        guard status == MMDB_SUCCESS, let list = entryList else {
+            throw GeoIP2Error.dataParsingFailed(reason: "Failed to get metadata")
+        }
+
+        return try parseEntryDataList(entryList: list)
     }
     
     /// Return data directly as a JSON string
@@ -557,57 +521,55 @@ public final class GeoIP2 {
     /// - Returns: Raw data JSON string
     /// - Throws: Error if lookup fails
     public func getRawDataJSON(ip: String) throws -> String {
-        return try queue.sync {
-            try ip.withCString { cString in
-                var gai_error: Int32 = 0
-                var mmdb_error: Int32 = 0
-                
-                // Execute query
-                let result = MMDB_lookup_string(mmdb, cString, &gai_error, &mmdb_error)
-                
-                // Check errors
-                if mmdb_error != MMDB_SUCCESS {
-                    throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: nil)
-                }
-                if gai_error != 0 {
-                    throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: gai_error)
-                }
-                
-                // If no entry is found, return empty result
-                guard result.found_entry else {
-                    return "{}"
-                }
-                
-                var entry = result.entry
-                var entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
-                let status = MMDB_get_entry_data_list(&entry, &entryList)
-                
-                // Ensure resources are released
-                defer {
-                    if let list = entryList {
-                        MMDB_free_entry_data_list(list)
-                    }
-                }
-                
-                guard status == MMDB_SUCCESS, let list = entryList else {
-                    throw GeoIP2Error.dataParsingFailed(reason: "Failed to get entry data list")
-                }
-                
-                // Parse data
-                let data = try parseEntryDataList(entryList: list)
-                
-                // Convert to JSON
-                let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]
-                guard let jsonData = try? JSONSerialization.data(withJSONObject: data, options: options),
-                      let jsonString = String(data: jsonData, encoding: .utf8) else {
-                    throw GeoIP2Error.dataParsingFailed(reason: "Failed to convert data to JSON")
-                }
-                
-                return jsonString
+        try ip.withCString { cString in
+            var gai_error: Int32 = 0
+            var mmdb_error: Int32 = 0
+
+            // Execute query
+            let result = MMDB_lookup_string(mmdb, cString, &gai_error, &mmdb_error)
+
+            // Check errors
+            if mmdb_error != MMDB_SUCCESS {
+                throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: nil)
             }
+            if gai_error != 0 {
+                throw GeoIP2Error.lookupFailed(code: mmdb_error, gaiError: gai_error)
+            }
+
+            // If no entry is found, return empty result
+            guard result.found_entry else {
+                return "{}"
+            }
+
+            var entry = result.entry
+            var entryList: UnsafeMutablePointer<MMDB_entry_data_list_s>?
+            let status = MMDB_get_entry_data_list(&entry, &entryList)
+
+            // Ensure resources are released
+            defer {
+                if let list = entryList {
+                    MMDB_free_entry_data_list(list)
+                }
+            }
+
+            guard status == MMDB_SUCCESS, let list = entryList else {
+                throw GeoIP2Error.dataParsingFailed(reason: "Failed to get entry data list")
+            }
+
+            // Parse data
+            let data = try parseEntryDataList(entryList: list)
+
+            // Convert to JSON
+            let options: JSONSerialization.WritingOptions = [.prettyPrinted, .sortedKeys]
+            guard let jsonData = try? JSONSerialization.data(withJSONObject: data, options: options),
+                  let jsonString = String(data: jsonData, encoding: .utf8) else {
+                throw GeoIP2Error.dataParsingFailed(reason: "Failed to convert data to JSON")
+            }
+
+            return jsonString
         }
     }
-    
+
     /// Parse MAP type data
     /// - Parameter entryList: Data list pointer
     /// - Returns: Parsed dictionary
